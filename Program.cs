@@ -141,7 +141,7 @@ app.MapPost("/auth/login", async (LoginRequest request, IHttpClientFactory clien
 
 // ========== TODO ENDPOINTS ==========
 
-app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactory, IConnectionMultiplexer? redis = null) =>
+app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactory, [FromServices] IConnectionMultiplexer? redis = null) =>
 {
     // What: Get user ID from Authorization header to create unique cache key
     var userId = "unknown";
@@ -288,6 +288,7 @@ app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFact
 ;
 
 app.Run();
+
 
 
 
