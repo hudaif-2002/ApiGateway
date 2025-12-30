@@ -144,7 +144,7 @@ app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactor
     if (redis == null)
     {
         Console.WriteLine("[NO REDIS] Fetching directly from TodoApi");
-        var client = clientFactory.CreateClient("TodoService");
+        var directClient = clientFactory.CreateClient("TodoService");
         if (context.Request.Headers.ContainsKey("Authorization"))
         {
             client.DefaultRequestHeaders.Authorization =
@@ -152,7 +152,7 @@ app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactor
         }
         var response = await client.GetAsync("/api/todos");
         var result = await response.Content.ReadAsStringAsync();
-        return Results.Content(result, "application/json", statusCode: (int)response.StatusCode);
+        return Results.Content(result, "application/json", statusCode: (int)directResponse.StatusCode);
     }
 
     var db = redis.GetDatabase();
@@ -277,6 +277,7 @@ app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFact
 ;
 
 app.Run();
+
 
 
 
