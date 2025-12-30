@@ -243,7 +243,7 @@ app.MapPost("/todos", async (CreateTodoRequest request, HttpContext context, IHt
 .WithOpenApi()
 ;
 
-app.MapPut("/todos/{id}", async (int id, UpdateTodoRequest request, HttpContext context, IHttpClientFactory clientFactory, IConnectionMultiplexer redis) =>
+app.MapPut("/todos/{id}", async (int id, UpdateTodoRequest request, HttpContext context, IHttpClientFactory clientFactory, [FromServices] IConnectionMultiplexer? redis = null) =>
 {
     var client = clientFactory.CreateClient("TodoService");
     
@@ -267,7 +267,7 @@ app.MapPut("/todos/{id}", async (int id, UpdateTodoRequest request, HttpContext 
 .WithOpenApi()
 ;
 
-app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFactory clientFactory, IConnectionMultiplexer redis) =>
+app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFactory clientFactory, [FromServices] IConnectionMultiplexer? redis = null) =>
 {
     var client = clientFactory.CreateClient("TodoService");
     
@@ -289,6 +289,7 @@ app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFact
 ;
 
 app.Run();
+
 
 
 
