@@ -142,19 +142,19 @@ app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactor
     var cacheKey = $"todos:user:{userId}";
     // What: Skip caching if Redis is not available
     if (redis == null)
+    if (redis == null)
     {
         Console.WriteLine("[NO REDIS] Fetching directly from TodoApi");
         var directClient = clientFactory.CreateClient("TodoService");
         if (context.Request.Headers.ContainsKey("Authorization"))
         {
-            client.DefaultRequestHeaders.Authorization =
+            directClient.DefaultRequestHeaders.Authorization =
                 AuthenticationHeaderValue.Parse(context.Request.Headers["Authorization"]!);
         }
-        var response = await client.GetAsync("/api/todos");
-        var result = await response.Content.ReadAsStringAsync();
-        return Results.Content(result, "application/json", statusCode: (int)directResponse.StatusCode);
+        var directResponse = await directClient.GetAsync("/api/todos");
+        var directResult = await directResponse.Content.ReadAsStringAsync();
+        return Results.Content(directResult, "application/json", statusCode: (int)directResponse.StatusCode);
     }
-
     var db = redis.GetDatabase();
 
     // What: Check if we have cached data for this user
