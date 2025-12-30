@@ -2,8 +2,13 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.OpenApi.Models;
 using ApiGateway.DTOs;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Redis Configuration - What: Connect to Redis for caching
+var redisConnection = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
+builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnection));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -124,25 +129,52 @@ app.MapPost("/auth/login", async (LoginRequest request, IHttpClientFactory clien
 
 // ========== TODO ENDPOINTS ==========
 
-app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactory) =>
+app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactory, IConnectionMultiplexer redis) =>
 {
-    var client = clientFactory.CreateClient("TodoService");
-    
+    // What: Get user ID from Authorization header to create unique cache key
+    var userId = "unknown";
     if (context.Request.Headers.ContainsKey("Authorization"))
     {
-        client.DefaultRequestHeaders.Authorization = 
+        var token = context.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        userId = token.Split('.')[1].Substring(0, 10);
+    }
+
+    var cacheKey = $"todos:user:{userId}";
+    var db = redis.GetDatabase();
+
+    // What: Check if we have cached data for this user
+    var cachedData = await db.StringGetAsync(cacheKey);
+    if (!cachedData.IsNullOrEmpty)
+    {
+        Console.WriteLine($"[CACHE HIT] Returning cached todos for {userId}");
+        return Results.Content(cachedData!, "application/json");
+    }
+
+    // What: Cache miss - fetch from TodoApi
+    Console.WriteLine($"[CACHE MISS] Fetching from TodoApi for {userId}");
+    var client = clientFactory.CreateClient("TodoService");
+
+    if (context.Request.Headers.ContainsKey("Authorization"))
+    {
+        client.DefaultRequestHeaders.Authorization =
             AuthenticationHeaderValue.Parse(context.Request.Headers["Authorization"]!);
     }
-    
+
     var response = await client.GetAsync("/api/todos");
     var result = await response.Content.ReadAsStringAsync();
-    
+
+    // What: Store in cache for 5 minutes
+    if (response.IsSuccessStatusCode)
+    {
+        await db.StringSetAsync(cacheKey, result, TimeSpan.FromMinutes(5));
+        Console.WriteLine($"[CACHED] Stored todos for {userId} (expires in 5 min)");
+    }
+
     return Results.Content(result, "application/json", statusCode: (int)response.StatusCode);
 })
 .WithName("GetTodos")
 .WithOpenApi()
 ;
-
 app.MapGet("/todos/{id}", async (int id, HttpContext context, IHttpClientFactory clientFactory) =>
 {
     var client = clientFactory.CreateClient("TodoService");
@@ -184,7 +216,7 @@ app.MapPost("/todos", async (CreateTodoRequest request, HttpContext context, IHt
 .WithOpenApi()
 ;
 
-app.MapPut("/todos/{id}", async (int id, UpdateTodoRequest request, HttpContext context, IHttpClientFactory clientFactory) =>
+app.MapPut("/todos/{id}", async (int id, UpdateTodoRequest request, HttpContext context, IHttpClientFactory clientFactory, IConnectionMultiplexer redis) =>
 {
     var client = clientFactory.CreateClient("TodoService");
     
@@ -208,7 +240,7 @@ app.MapPut("/todos/{id}", async (int id, UpdateTodoRequest request, HttpContext 
 .WithOpenApi()
 ;
 
-app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFactory clientFactory) =>
+app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFactory clientFactory, IConnectionMultiplexer redis) =>
 {
     var client = clientFactory.CreateClient("TodoService");
     
@@ -230,4 +262,9 @@ app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFact
 ;
 
 app.Run();
+
+
+
+
+
 
