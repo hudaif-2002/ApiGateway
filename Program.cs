@@ -6,10 +6,17 @@ using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Redis Configuration - What: Connect to Redis for caching
-var redisConnection = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
-builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnection));
-
+// Redis Configuration - What: Try to connect to Redis, but work without it if unavailable
+var redisConnection = builder.Configuration["Redis:ConnectionString"] ?? builder.Configuration["REDIS_URL"] ?? "localhost:6379";
+try {
+    var redis = ConnectionMultiplexer.Connect(redisConnection + ",abortConnect=false");
+    builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+    Console.WriteLine("[REDIS] Connected to: " + redisConnection);
+}
+catch (Exception ex) {
+    Console.WriteLine("[REDIS] Failed to connect: " + ex.Message + ". Gateway will work without caching.");
+    builder.Services.AddSingleton<IConnectionMultiplexer>((IConnectionMultiplexer)null);
+}
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -277,6 +284,7 @@ app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFact
 ;
 
 app.Run();
+
 
 
 
