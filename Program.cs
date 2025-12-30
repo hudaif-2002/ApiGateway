@@ -8,17 +8,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Redis Configuration - What: Try to connect to Redis, but work without it if unavailable
 var redisConnection = builder.Configuration["Redis:ConnectionString"] ?? builder.Configuration["REDIS_URL"] ?? "localhost:6379";
+IConnectionMultiplexer? redisMultiplexer = null;
 try {
     var redis = ConnectionMultiplexer.Connect(redisConnection + ",abortConnect=false,connectTimeout=2000");
-    // What: Test if Redis is actually usable
     var db = redis.GetDatabase();
     db.Ping();
-    builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+    redisMultiplexer = redis;
     Console.WriteLine("[REDIS] Connected and verified: " + redisConnection);
 }
 catch (Exception ex) {
     Console.WriteLine("[REDIS] Failed to connect: " + ex.Message + ". Gateway will work without caching.");
-    builder.Services.AddSingleton<IConnectionMultiplexer>((IConnectionMultiplexer)null);
+}
+if (redisMultiplexer != null) {
+    builder.Services.AddSingleton<IConnectionMultiplexer>(redisMultiplexer);
 }
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -139,7 +141,7 @@ app.MapPost("/auth/login", async (LoginRequest request, IHttpClientFactory clien
 
 // ========== TODO ENDPOINTS ==========
 
-app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactory, IConnectionMultiplexer redis) =>
+app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactory, IConnectionMultiplexer? redis = null) =>
 {
     // What: Get user ID from Authorization header to create unique cache key
     var userId = "unknown";
@@ -286,6 +288,7 @@ app.MapDelete("/todos/{id}", async (int id, HttpContext context, IHttpClientFact
 ;
 
 app.Run();
+
 
 
 
