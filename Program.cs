@@ -9,9 +9,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Redis Configuration - What: Try to connect to Redis, but work without it if unavailable
 var redisConnection = builder.Configuration["Redis:ConnectionString"] ?? builder.Configuration["REDIS_URL"] ?? "localhost:6379";
 try {
-    var redis = ConnectionMultiplexer.Connect(redisConnection + ",abortConnect=false");
+    var redis = ConnectionMultiplexer.Connect(redisConnection + ",abortConnect=false,connectTimeout=2000");
+    // What: Test if Redis is actually usable
+    var db = redis.GetDatabase();
+    db.Ping();
     builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
-    Console.WriteLine("[REDIS] Connected to: " + redisConnection);
+    Console.WriteLine("[REDIS] Connected and verified: " + redisConnection);
 }
 catch (Exception ex) {
     Console.WriteLine("[REDIS] Failed to connect: " + ex.Message + ". Gateway will work without caching.");
