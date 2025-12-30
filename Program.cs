@@ -149,7 +149,6 @@ app.MapGet("/todos", async (HttpContext context, IHttpClientFactory clientFactor
     var cacheKey = $"todos:user:{userId}";
     // What: Skip caching if Redis is not available
     if (redis == null)
-    if (redis == null)
     {
         Console.WriteLine("[NO REDIS] Fetching directly from TodoApi");
         var directClient = clientFactory.CreateClient("TodoService");
